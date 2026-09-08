@@ -1082,7 +1082,8 @@
             "var": {
               "title": "Template Path",
               "type": "string",
-              "description": "Local file path to the Word (.docx) template.",
+              "description": "Path or URL to the .docx Jinja2 template used for the patrol report.",
+              "default": "https://raw.githubusercontent.com/wildlife-dynamics/ICMBio-patrol_analysis/main/resources/templates/relatorio_bimestral_template.docx",
               "ecoscope:advanced": false
             }
           },

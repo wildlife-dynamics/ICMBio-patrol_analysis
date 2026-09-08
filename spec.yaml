@@ -65,7 +65,8 @@ rjsf-overrides:
     Event Style.properties.event_colormap.properties.custom_colors.ecoscope:advanced: false
 
     Patrol Report.properties.report_template_path.properties.var.title: Template Path
-    Patrol Report.properties.report_template_path.properties.var.description: "Local file path to the Word (.docx) template."
+    Patrol Report.properties.report_template_path.properties.var.description: "Path or URL to the .docx Jinja2 template used for the patrol report."
+    Patrol Report.properties.report_template_path.properties.var.default: "https://raw.githubusercontent.com/wildlife-dynamics/ICMBio-patrol_analysis/main/resources/templates/relatorio_bimestral_template.docx"
     Patrol Report.properties.report_template_path.properties.var.ecoscope:advanced: false
 
     download_attachments.properties.skip_download.title: Skip Photo Attachments
