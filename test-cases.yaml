@@ -1,0 +1,56 @@
+iguacu-bimestral:
+  name: Iguaçu Relatório Bimestral
+  description: Patrol analysis report for Parque Nacional do Iguaçu.
+  params:
+    workflow_details:
+      name: Relatório Bimestral
+      description: ""
+    er_client:
+      data_source:
+        name: icmbio
+    time_range:
+      since: "2026-01-01T00:00:00.000Z"
+      until: "2026-02-28T23:59:00.000Z"
+    base_maps:
+      base_maps:
+        - url: >-
+            https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}
+          opacity: 1
+        - url: >-
+            https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}
+          opacity: 0.5
+    spatial_features:
+      feature_class_names:
+        - "Areas Protegidas"
+    aoi_filter:
+      values:
+        - "Parque Nacional do Iguaçu"
+    patrol_observations:
+      patrol_types: []
+      status:
+        - done
+    trajs_all:
+      trajectory_segment_filter:
+        min_length_meters: 0.001
+        max_length_meters: 500
+        min_time_secs: 1
+        max_time_secs: 172800
+        min_speed_kmhr: 0.01
+        max_speed_kmhr: 500
+    aoi_legend_title:
+      var: Legenda
+    trajs_legend_title:
+      var: Legenda
+    patrol_colormap:
+      input_column_name: extra__patrol_type__display
+      colormap: Set2
+    patrol_and_events_params:
+      patrol_types: []
+      event_types: []
+    event_colormap:
+      input_column_name: event_type_display
+      colormap: Set2
+    event_legend_title:
+      var: Legenda
+    report_template_path:
+      var: "file:///workspace/resources/templates/Relatório Bimestral_modelo.docx"

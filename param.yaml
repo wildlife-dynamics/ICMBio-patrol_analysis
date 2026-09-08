@@ -1,0 +1,97 @@
+# Real values confirmed live against the parnaiguacu EarthRanger account
+# (Iguaçu/report.html + direct verification during this build): 204 patrols
+# and 157 threat events over the last ~12 months, 10 patrol types, and a
+# real park-boundary feature named "Parque Nacional do Iguaçu".
+#
+# Time range: narrowed to a real 2-month "bimestral" window (Jul-Aug 2026)
+# now that the full pipeline has been verified end-to-end against the wider
+# ~12-month test window.
+
+workflow_details:
+  name: Relatório Bimestral
+  description: ""
+
+er_client:
+  data_source:
+    name: parnaiguacu
+
+time_range:
+  since: "2026-07-01T00:00:00.000Z"
+  until: "2026-09-01T00:00:00.000Z"
+
+base_maps:
+  base_maps:
+    - url: >-
+        https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}
+      opacity: 1
+    - url: >-
+        https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}
+      opacity: 0.5
+
+patrol_observations:
+  patrol_types: []
+  status:
+    - done
+    - active
+    - overdue
+    - cancelled
+
+# Verified against the full real parnaiguacu dataset (check_map_extents.py):
+# 0 of 181 real events and only 6 of 184,346 real patrol observations (a
+# bad GPS fix in Lima, Peru — see spec.yaml's "Relocations In Bounds" step)
+# fall outside this box.
+relocs_in_bounds:
+  bounding_box:
+    min_y: -27.0
+    max_y: -24.0
+    min_x: -56.0
+    max_x: -53.0
+
+trajs:
+  trajectory_segment_filter:
+    min_length_meters: 0.001
+    max_length_meters: 500
+    min_time_secs: 1
+    max_time_secs: 172800
+    min_speed_kmhr: 0.01
+    max_speed_kmhr: 500
+
+trajs_legend_title:
+  var: Tipo de patrulha
+
+patrol_colormap:
+  input_column_name: extra__patrol_type__display
+  colormap: Set2
+
+# layer_style must be explicitly present here (even partially) — when
+# absent entirely, the task falls back to its own default style object
+# (get_color=None), which deck.gl renders as solid black. Confirmed via
+# apn/workflows/patrol_event/param.yaml's real, working equivalent, which
+# sets exactly this one field the same way. The rjsf-overrides in
+# spec.yaml only pre-fill the value shown in the real UI form — they don't
+# apply when a config file is read directly and the key is simply
+# missing, which is how we run this in dev.
+trajs_layer:
+  layer_style:
+    get_color: column_color
+
+event_colormap:
+  input_column_name: event_type_display
+  colormap: Set2
+
+event_legend_title:
+  var: Tipo de evento
+
+event_layer:
+  layer_style:
+    get_fill_color: column_color
+    get_line_color: column_color
+
+download_attachments:
+  skip_download: true
+
+# docxtpl template built from the partner's real mockup by
+# scripts/build_relatorio_bimestral_template.py — see that script and
+# resources/templates/README.md.
+report_template_path:
+  var: "file:///Users/zak/Documents/w-dynamics/ICMBio-patrol_analysis/resources/templates/relatorio_bimestral_template.docx"
