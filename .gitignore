@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ecoscope-workflows: matches convention in apn/latam-patrol_summary — the
+# Makefile is a personal convenience wrapper (not the canonical build entry
+# point, that's dev/recompile.sh).
+Makefile
+Makefile.local
+.claude
+~$*
+.tmp
+.DS_Store
