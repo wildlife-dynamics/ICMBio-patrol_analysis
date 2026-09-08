@@ -1,47 +1,21 @@
 id: patrol_analysis
 
-# NOTE: version pins below were initially copied from wt-patrol-summary's
-# spec.yaml (ecoscope-workflows-core / ecoscope-workflows-ext-ecoscope +
-# ecoscope-workflows-ext-custom 0.0.48.*), but that combo failed to solve
-# for real: ecoscope-workflows-ext-custom 0.0.48 depends on a broken
-# pydeck==0.0.2 pin. curacao-nest_hatching's and apn/workflows/patrol_event's
-# spec.yaml (both confirmed real, currently-compiling specs, read directly)
-# instead pair the OLDER-named `ecoscope-platform` package with a newer
-# `ecoscope-workflows-ext-custom` release-candidate — that combo is used
-# here instead.
 requirements:
   - name: ecoscope-platform
     version: ">=2.17.0,<3.0.0"
     channel: https://repo.prefix.dev/ecoscope-workflows/
 
   - name: ecoscope-workflows-ext-custom
-    version: "0.1.0rc24"
+    version: "0.1.1"
     channel: https://repo.prefix.dev/ecoscope-workflows-custom/
 
   - name: pydeck
     version: 0.9.2
     channel: conda-forge
 
-  # ICMBio-specific task package. Originally borrowed apply_qualitative_
-  # color_map / spatial_assign from ecoscope-workflows-ext-icf (a generic
-  # utility duplicated identically in both ext-icf and ext-apn — neither
-  # partner-specific), but owning small, well-understood utilities here
-  # instead avoids depending on an unrelated partner's package and the
-  # wt-compiler ambiguity errors that come from both packages defining the
-  # same task name. apply_qualitative_color_map/assign_sector below are our
-  # own implementations (apply_qualitative_color_map: a thin wrapper around
-  # core ecoscope.analysis.classifier.apply_color_map; assign_sector: a
-  # simpler geopandas sjoin/sjoin_nearest point-in-polygon join, not
-  # ICF's more complex 3-tier STRtree implementation built for trajectories
-  # too — both verified directly against real parnaiguacu data before
-  # being wired in here). Built locally via `make build` (wd-partner-tasks:
-  # BUILD_PKG=icmbio pixi run build-release) into the local channel above —
-  # not yet published.
-  # locally via `make build` (wd-partner-tasks: BUILD_PKG=icmbio pixi run
-  # build-release) into the local channel above — not yet published.
   - name: ecoscope-workflows-ext-icmbio
-    version: "*"
-    channel: file:///tmp/ecoscope-workflows-custom/release/artifacts/
+    version: "0.0.0"
+    channel: https://repo.prefix.dev/ecoscope-workflows-custom/
 
 rjsf-overrides:
   properties:
