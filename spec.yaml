@@ -13,9 +13,14 @@ requirements:
     version: 0.9.2
     channel: conda-forge
 
+  # ICMBio-specific task package, still under active local development —
+  # built via `make build` (wd-partner-tasks: BUILD_PKG=icmbio pixi run
+  # build-release) into the local channel below, not the published one, so
+  # source changes here take effect on the next `make compile` without
+  # needing a release first.
   - name: ecoscope-workflows-ext-icmbio
-    version: "0.0.0"
-    channel: https://repo.prefix.dev/ecoscope-workflows-custom/
+    version: "*"
+    channel: file:///tmp/ecoscope-workflows-custom/release/artifacts/
 
 rjsf-overrides:
   properties:
@@ -73,37 +78,9 @@ rjsf-overrides:
     download_attachments.properties.skip_download.description: "If True, skip downloading event photos, and the report will not include any images."
     download_attachments.properties.skip_download.ecoscope:advanced: false
 
-    # ── Map viewport (shared by Patrol Coverage Map + Events Map) ─────────────
-    # viewport_settings' own fields already carry real title/description/
-    # ecoscope:advanced via AdvancedField on the ViewportSettings model
-    # itself (ecoscope_workflows_ext_icmbio/tasks/_map_utils.py) — no
-    # per-field overrides needed for those, just a friendlier wrapper
-    # title/description, and the wrapper itself marked advanced (matches
-    # icf/workflows/patrol_events' pattern of marking the parent
-    # layer_style object advanced too, not just its children).
     Map Viewport.properties.viewport_settings.properties.settings.title: Map Viewport
     Map Viewport.properties.viewport_settings.properties.settings.description: "Controls how tightly every map zooms and frames its data. Applies to all maps at once. Only adjust if maps consistently look too zoomed in or out."
     Map Viewport.properties.viewport_settings.properties.settings.ecoscope:advanced: true
-
-    # ── Layer style exposure (patrol tracks / events / time density) ──────────
-    # layer_style is left out of partial: in the workflow section above so
-    # these become real, user-editable form fields (matches apn/workflows/
-    # patrol_event/spec.yaml's real pattern, read in full — every field
-    # below mirrors its exact technique). Field list per model verified
-    # directly against our own compiled rjsf.json's $defs (not guessed):
-    # PathLayerStyle (trajs_layer), ScatterplotLayerStyle (event_layer),
-    # PolygonLayerStyle (time_density_layer). get_color/get_fill_color/
-    # get_line_color/get_path/get_position/get_polygon are declared here
-    # (fixed default + single-value enum) but hidden from the form via
-    # uiSchema below — they're derived from the colormap step, not a style
-    # choice. get_width/get_radius/get_line_width/get_elevation have a base
-    # type of anyOf:[string, number] (a column-name OR a fixed value) —
-    # each is collapsed to a single numeric option, matching apn's exact
-    # technique (an unresolved 2-option anyOf risks the same rendering
-    # failure as the allOf/bare-$ref gotcha documented in ETD/docs/
-    # rjsf-anyof-switch-blanking-bug.md). layer_style's own .description is
-    # blanked (apn does the same) so the auto-generated "Style arguments
-    # for the layer." text doesn't show above the field list.
 
     Patrol Style.properties.trajs_layer.properties.layer_style.description: ""
     Patrol Style.properties.trajs_layer.properties.layer_style.properties.auto_highlight.type: boolean
@@ -307,25 +284,14 @@ rjsf-overrides:
       - event_type_display
       - time
 
-    # ── Spatial Features (optional extra map overlays, apn's real pattern) ────
-    # source.default gives the object a real instantiated shape ({query:
-    # null}) rather than a bare None — matches apn's real override exactly;
-    # the $defs/uiSchema pair below give the "no selection" option a
-    # friendly "--- select ---" label instead of a blank one, and hide the
-    # redundant field labels on the nested selector (apn does the same).
     Spatial Features.properties.spatial_features.properties.source.default:
       query: null
     Spatial Features.properties.spatial_features.properties.legend_title.ui:placeholder: "e.g. Park Boundary"
     Local Spatial Features.properties.local_spatial_file.properties.file_path.title: Local File Path
     Local Spatial Features.properties.local_spatial_file.properties.file_path.description: "GeoJSON (.geojson), GeoPackage (.gpkg), or GeoParquet (.parquet/.geoparquet)."
+    Local Spatial Features.properties.local_spatial_file.properties.layer.default: ""
+    Local Spatial Features.properties.local_spatial_file.properties.style.default: []
 
-
-  # EarthRangerSource is the union type behind Spatial Features'
-  # `source` field (FeatureSetQuery | FeatureTypeQuery | FeatureIdQuery |
-  # None) — this override gives the "no selection" branch a real
-  # "--- select ---" label instead of a blank one, matching apn's exact
-  # override (copied from its own compiled rjsf.json $defs, per that
-  # project's own documented convention for this).
   $defs:
     EarthRangerSource:
       title: EarthRanger
@@ -372,8 +338,6 @@ task-instance-defaults:
       - any_dependency_skipped
 
 workflow:
-  # ── Infrastructure ────────────────────────────────────────────────────────────
-
   - name: Workflow Details
     id: workflow_details
     task: set_workflow_details
@@ -397,8 +361,11 @@ workflow:
     id: base_maps
     task: set_base_maps
 
-  # ── Patrol observations & trajectories ───────────────────────────────────────
-  # Reused verbatim from latam-patrol_summary/spec.yaml.
+  - name: Define Groupers
+    id: groupers
+    task: set_groupers
+    partial:
+      groupers: []
 
   - title: ""
     type: task-group
@@ -446,23 +413,6 @@ workflow:
             - x: 1.000000
               y: 1.000000
 
-  # Real bug found live against parnaiguacu (Iguaçu/.scripts, or the
-  # scratch check_map_extents.py check): 6 of 184,346 real patrol
-  # observations (patrol_ids bf42d6a9-4ece-4bcb-b183-331876d2c98e and
-  # cb0f4e2c-1ec4-4f00-9fa9-47cf1e8876d8, all on 2026-02-17) report a real,
-  # well-formed but wildly wrong GPS fix in Lima, Peru (lat -12.14, lon
-  # -77.02) instead of Iguaçu — a genuine bad fix, not one of
-  # process_relocations' filter_point_coords sentinel values, so nothing
-  # upstream catches it. apply_reloc_coord_filter (core,
-  # ecoscope.platform.tasks.transformation._filtering) is the platform's
-  # real bounding-box config for exactly this. bounding_box is left unset
-  # here (same pattern as trajs' trajectory_segment_filter below) — it's a
-  # user-configurable workflow input, set in param.yaml, not hardcoded.
-  # roi_gdf/roi_name are pinned to null (we're not using ROI-based
-  # filtering, only the bounding box) — a DataFrame-typed param can't be
-  # left exposed/configurable, the wt-compiler can't render it as a form
-  # field ("'ecoscope.platform.annotations.DataFrame' is not valid under
-  # any of the given schemas").
   - name: Filter Relocation
     id: relocs_in_bounds
     task: apply_reloc_coord_filter
@@ -477,8 +427,6 @@ workflow:
     task: relocations_to_trajectory
     partial:
       relocations: ${{ workflow.relocs_in_bounds.return }}
-
-  # ── Headline stat cards ──────────────────────────────────────────────────────
 
   - title: Patrol Summary Stats
     type: task-group
@@ -528,27 +476,9 @@ workflow:
           decimal_places: 2
           data: ${{ workflow.total_distance_km.return }}
 
-      # Participantes/operadores. CONFIRMED live against parnaiguacu:
-      # get_patrol_observations (trajs) DOES carry the leader after all —
-      # trajs' extra__patrol_subject/extra__subject_id match
-      # patrol_segments[].leader.name/.id from the raw get_patrols() output
-      # exactly, verified against 16 real patrols (an earlier claim in this
-      # file that trajs has no leader field was wrong — no separate
-      # get_patrols() fetch or extract_patrol_leaders task is needed).
-      # There is no separate multi-person "participants" list anywhere in
-      # this schema, so this is modeled as the count of distinct patrol
-      # leaders (extra__patrol_subject), not a per-patrol headcount.
-      #
-      # OPEN QUESTION (PRD, Portuguese original, user-supplied): "aqui será
-      # incluída a equipe de apoio? Se possível, deve aparecer essa
-      # informação, ou deixar editável para ser inserido posteriormente" —
-      # the partner is asking whether support-crew members will be included
-      # here, and suggests making the field manually editable if not. This
-      # confirms there's no automatic "equipe de apoio" data (matches the
-      # finding above — only a single leader exists, not a crew list).
-      # Currently left as this auto-computed leader-count stat card, NOT a
-      # manually-editable field — needs a decision on which the report
-      # should actually show before this is final.
+      # TODO: this counts patrol leaders only. EarthRanger has no support-crew
+      # ("equipe de apoio") list, so decide with the partner whether that's
+      # fine as-is or whether this field should be manually editable instead.
       - name: Count Participants
         id: total_participants
         task: dataframe_column_nunique
@@ -567,8 +497,6 @@ workflow:
           decimal_places: 0
           data: ${{ workflow.total_participants.return }}
 
-  # ── Patrols included table (Patrulhas incluídas) ─────────────────────────────
-
   - title: Patrol Summary Table
     type: task-group
     description: ""
@@ -580,8 +508,6 @@ workflow:
           groupby_cols:
             - extra__patrol_serial_number
           reset_index: true
-          # PRD (Portuguese original, user-supplied): "tipo? (não precisa de
-          # tipo)" — patrol type explicitly not wanted in this table.
           summary_params:
             - display_name: "Início"
               aggregator: min
@@ -643,14 +569,6 @@ workflow:
           title: "Patrulhas incluídas"
           data: ${{ workflow.patrol_stats_table_html.return }}
 
-  # ── Optional extra map overlays (apn/workflows/patrol_event's real pattern) ──
-  # Both left fully open (no partial beyond wiring geodataframe -> layer) so
-  # every param is user-configurable: which ER feature layer to overlay
-  # (or none — source defaults to null), or a locally-uploaded GeoJSON/
-  # GeoPackage/GeoParquet file. Neither is a PRD requirement — added as
-  # optional ranger-facing flexibility on the Patrol Coverage Map, matching
-  # apn's own usage.
-
   - title: Spatial Features
     type: task-group
     description: "Optionally overlay any EarthRanger spatial feature layer on the patrol map."
@@ -679,12 +597,6 @@ workflow:
           geodataframe: ${{ workflow.local_spatial_file.return }}
           tooltip_columns: []
 
-  # Merges the two optional overlay layers ONCE so both the Patrol Coverage
-  # Map and the Events Map can reuse the same list instead of each
-  # re-listing spatial_features_layer/local_spatial_features_layer
-  # separately — collect_optional_layers flattens nested lists, so this
-  # return value can just be dropped in as one entry alongside each map's
-  # own data layer (trajs_layer / event_layer) below.
   - title: Map Overlays
     type: task-group
     description: "Optional extra layers shared by every map (Spatial Features, Local Spatial Features)."
@@ -699,34 +611,12 @@ workflow:
             - ${{ workflow.spatial_features_layer.return }}
             - ${{ workflow.local_spatial_features_layer.return }}
 
-  # set_viewport_settings (ecoscope_workflows_ext_icmbio) exposes
-  # compute_view_from_geodataframes' framing params (width/height/padding/
-  # outlier trim) ONCE, reused by both patrol_map_view_state and
-  # events_map_view_state below — since every map on this dashboard
-  # renders at the same widget size, these should never need to differ
-  # between maps. Same "set it outside the task-group, reuse it" pattern
-  # as Map Overlays above, just for a settings object instead of layers.
   - title: Map Viewport
     type: task-group
     description: "Controls how tightly every map zooms and frames its data. Applies to all maps at once. Only adjust if maps consistently look too zoomed in or out."
     tasks:
       - id: viewport_settings
         task: ecoscope_workflows_ext_icmbio.tasks.set_viewport_settings
-
-  # ── Patrol track layer ───────────────────────────────────────────────────────
-
-  # OPEN QUESTION (PRD, Portuguese original, user-supplied partner review
-  # note): "trocar por legenda com os tipos de eventos associados, já que...
-  # estão ainda errando na informação do 'tipo de patrulha'" — the partner
-  # says patrol_type data entry is unreliable and wants this map's legend
-  # to show the ASSOCIATED EVENT TYPES per patrol instead of patrol_type.
-  # Not implemented: a single patrol can have multiple different event
-  # types recorded during it, so "color the track by its event type(s)"
-  # isn't a 1-to-1 mapping — needs a decision (e.g. color by the patrol's
-  # most frequent associated event type, or drop this map's legend/coloring
-  # entirely and rely on the separate Events Map instead) before building.
-  # Colored by patrol_type below for now, per the ORIGINAL (uncorrected)
-  # PRD wording.
 
   - title: Patrol Style
     type: task-group
@@ -754,16 +644,6 @@ workflow:
       - id: trajs_legend_title
         task: set_string_var
 
-      # layer_style is left OUT of partial (unlike before) so its cosmetic
-      # fields (opacity/width/units/etc.) become real user-configurable
-      # form inputs via rjsf-overrides below — matches apn/workflows/
-      # patrol_event/spec.yaml's real, working pattern. get_color/get_path
-      # are still pinned (via rjsf default + enum + uiSchema hidden) since
-      # they're programmatically tied to column_color/geometry.coordinates,
-      # not a style choice. Confirmed empirically: partially setting a
-      # nested param via `partial:` locks the WHOLE param (verified against
-      # our own compiled params.json) — it must be left out entirely for
-      # any of its sub-fields to stay configurable.
       - id: trajs_layer
         task: create_path_layer
         partial:
@@ -774,23 +654,10 @@ workflow:
             color_column: column_color
           data_url: null
 
-  # ── Patrol tracks map ────────────────────────────────────────────────────────
-
   - title: Patrol Coverage Map
     type: task-group
     description: "All patrol tracks in the period, legend by patrol type."
     tasks:
-      # Fed ONLY trajs.return (real patrol data) — deliberately NOT
-      # patrol_map_layers.return (the merged render list below, which
-      # includes the optional Spatial Features / Local Spatial Features
-      # overlays). Matches apn/workflows/patrol_event's real pattern:
-      # view_state_from_layers there is given a separate, narrower layer
-      # list than draw_map's geo_layers, so an arbitrary uploaded/selected
-      # spatial feature (e.g. a country-wide layer) can't blow out the
-      # view framing. viewport: Map Viewport's shared viewport_settings
-      # (same object events_map_view_state uses below) — defaults tuned +
-      # verified against real patrol data, see Iguaçu/.scripts/
-      # check_view_state_computation.py and render_view_state_comparison.py.
       - id: patrol_map_view_state
         task: compute_view_from_geodataframes
         partial:
@@ -838,18 +705,6 @@ workflow:
           title: "Mapa de trilhas de patrulha"
           data: ${{ workflow.patrol_map_url.return }}
 
-  # ── Time density map ─────────────────────────────────────────────────────────
-  # calculate_elliptical_time_density confirmed real (registry signature
-  # dump against the compiled workflow's own env) — no meshgrid/weighting
-  # spec needed (that's only for the LINEAR variant, used by wildaid's real
-  # patrol_event spec for a different purpose). The
-  # auto_scale_or_custom_cell_size/percentiles shape is taken from
-  # save-the-elephants' real usage (workflows/general_report/spec.yaml);
-  # the layer/map rendering below reuses this repo's own already-confirmed
-  # create_polygon_layer_pydeck/draw_map pattern (the AOI layer) rather than
-  # save-the-elephants' create_geojson_layer/combine_deckgl_map_layers,
-  # which need packages not required here.
-
   - title: Patrol Time Density Map
     type: task-group
     description: "% of time spent per grid cell."
@@ -875,10 +730,6 @@ workflow:
           output_column_name: percentile_color
           colormap: RdYlGn
 
-      # layer_style left out of partial — see trajs_layer's comment above
-      # for why (opacity/stroked/filled/units become configurable via
-      # rjsf-overrides; get_fill_color/get_line_color stay pinned to
-      # percentile_color, this layer's actual color column).
       - id: time_density_layer
         task: create_polygon_layer_pydeck
         partial:
@@ -929,45 +780,10 @@ workflow:
           title: "Mapa de densidade de tempo"
           data: ${{ workflow.time_density_map_url.return }}
 
-  # ── Events fetch ──────────────────────────────────────────────────────────────
-  # REBUILT after a real bug found running against live parnaiguacu data:
-  # unpack_events_from_patrols_df_and_combined_params (patrol-linked events)
-  # never produces an `event_type_display` column — that column only comes
-  # from get_events(..., include_display_values=True). apn's own real spec
-  # calls get_events as a genuinely separate step for exactly this reason;
-  # trying to get away with only the patrol-linked path (as this spec
-  # originally did) breaks every downstream step that groups/filters by
-  # display name. Switching to get_events directly also simplifies the
-  # pipeline (no process_events_details/get_event_categories/
-  # map_event_category_display needed — get_events already returns raw
-  # event_details and display names in one call) and is a better match for
-  # the PRD anyway ("all threat activity in the park", not just
-  # patrol-linked events).
-  #
-  # event_types filters to the real confirmed slugs for the 5 threat types +
-  # 2 camera-trap types (Iguaçu/report.html) — the account also has ~1300
-  # unrelated "Observação iNaturalist" events in the same window that would
-  # otherwise swamp every table/chart/map below.
-  #
-  # NOTE: event_type_display holds the human display name (e.g. "Caça"),
-  # NOT the slug — filter/group by the raw `event_type` column when slugs
-  # are needed, and by `event_type_display` only for labels/legends.
-
   - title: Events
     type: task-group
     description: ""
     tasks:
-      # event_columns/include_updates/include_related_events/
-      # force_point_geometry are internal fetch plumbing, not user-facing
-      # choices — hardcoded here, matching every real sibling workflow
-      # (apn/patrol_event, icf/patrol_events, wildaid-patrol_event all
-      # hardcode this exact set of get_events params). Column list is
-      # exactly what our own pipeline actually reads downstream: id/time/
-      # event_type for filtering and display, serial_number for "ID do
-      # evento", event_details for the Ameaças/Atropelamentos/camera-trap
-      # tables, geometry for lat/lon + sector assignment, reported_by for
-      # Responsável (Armadilhas fotográficas). event_category included to
-      # match the same real workflows even though we don't group by it.
       - id: events_raw
         task: get_events
         partial:
@@ -1006,19 +822,6 @@ workflow:
           columns:
             - time
 
-      # Real bug found live against parnaiguacu (Iguaçu/.scripts/
-      # check_threat_event_field_resolution.py): raw event_details values
-      # for select/radio/repeating-group fields are internal choice slugs
-      # (e.g. "16a30dias", "destruicaoinutilizacao", "saleiro"), not human
-      # labels — the display text lives in a separate schema endpoint
-      # (schemas/choices.json?field=...), referenced by $ref, not inline.
-      # process_events_details (core, ecoscope.platform.tasks.io.
-      # _earthranger, confirmed real/registered) fetches each event type's
-      # schema live and resolves every enum value AND maps keys to human
-      # titles, including nested repeating groups (e.g. "estruturas
-      # observadas") — verified directly against real events of all 4
-      # threat types before wiring in; format_threat_event_details /
-      # format_roadkill_event_details now read the resolved+titled keys.
       - id: events_details_resolved
         task: process_events_details
         partial:
@@ -1031,8 +834,6 @@ workflow:
         task: add_lat_lon_to_gdf
         partial:
           event_gdf: ${{ workflow.events_details_resolved.return }}
-
-  # ── Eventos observados (tipo, quantidade) ────────────────────────────────────
 
   - title: Events Summary Table
     type: task-group
@@ -1085,17 +886,7 @@ workflow:
           title: "Eventos observados"
           data: ${{ workflow.events_by_type_table_html.return }}
 
-  # ── Sector layer (real grid squares) ────────────────────────────────────────
-  # CONFIRMED live against parnaiguacu (see /Users/zak/Documents/w-dynamics/
-  # Iguaçu/report.html and .scripts/get_sector_layer.py): the PRD's "grid
-  # squares" are NOT an abstract mesh/H3 grid — ICMBio already has a real
-  # 28-polygon sector layer ("Sector Ecoscope", ~110–113 km² each, a 100%
-  # IoU match against the authoritative PATRL shapefile) in EarthRanger's
-  # own Spatial Features, hidden by default (is_visible=False). Fetched here
-  # via get_icmbio_sector_layer (ecoscope-workflows-ext-icmbio), which uses
-  # the confirmed include_hidden=true fix. Point-in-polygon assignment uses
-  # spatial_assign (ecoscope-workflows-ext-icf, real/tested).
-
+  # Sector layer (real grid squares)
   - title: Sector Layer
     type: task-group
     description: "Fetch ICMBio's real 28-sector patrol grid ('Sector Ecoscope')."
@@ -1109,14 +900,6 @@ workflow:
         task: ecoscope_workflows_ext_icmbio.tasks.compute_sector_centroids
         partial:
           sectors_df: ${{ workflow.sectors.return }}
-
-  # ── Camera traps table (Armadilhas fotográficas) ─────────────────────────────
-  # Real event types confirmed in report.html: armadilhas_fotogrficas
-  # (installation) + retirada_armadilhas_fotogrficas (retrieval). The form
-  # has no "sector" field — sector comes from spatially joining against the
-  # Sector Layer above. "Responsável" is left blank (per instruction):
-  # nome_da_pessoa_responsável on the real form stores an internal person
-  # ID, not a name, and no ID-to-name lookup task exists anywhere.
 
   - title: Camera Traps Table
     type: task-group
@@ -1164,16 +947,6 @@ workflow:
           title: "Armadilhas fotográficas"
           data: ${{ workflow.camera_trap_table_html.return }}
 
-  # ── Threat event detail table (Ameaças) ──────────────────────────────────────
-  # CONFIRMED per report.html: 4 of 5 threat types share the 4 generic
-  # detail fields (caceria, pesca_ilegal, explorao_vegetal fully; outras_ameaas
-  # is missing "situação do local" and "estruturas observadas" — left blank,
-  # not an error). Roadkill (atropelamento_v2) has NONE of the 4 fields and
-  # is explicitly recommended (report.html "What to fix") to get its own
-  # table rather than being forced into this one — see "Roadkill Events
-  # Table" below. format_threat_event_details (ecoscope-workflows-ext-icmbio)
-  # uses the real field keys found live on the server.
-
   - title: Threat Events Table
     type: task-group
     description: ""
@@ -1213,15 +986,6 @@ workflow:
         partial:
           title: "Ameaças"
           data: ${{ workflow.threat_events_table_html.return }}
-
-  # ── Roadkill events table (Atropelamento) ────────────────────────────────────
-  # NEW per report.html's explicit recommendation: atropelamento_v2 asks
-  # about weather, how the animal was found, species, and team — none of
-  # the 4 generic "Detalhes do evento" fields — so it gets its own columns
-  # instead of 4 blank cells in the Ameaças table. Real field keys pulled
-  # live via Iguaçu/.scripts/check_roadkill_event_details.py (schema +
-  # 3 real recorded events) — coverage is spotty across those 3 events, so
-  # blanks in this table reflect real incomplete data entry, not a bug.
 
   - title: Roadkill Events Table
     type: task-group
@@ -1263,12 +1027,6 @@ workflow:
           title: "Atropelamentos"
           data: ${{ workflow.roadkill_events_table_html.return }}
 
-  # ── Grid-square event summary ────────────────────────────────────────────────
-  # Uses the real Sector Layer above, not an abstract mesh grid (confirmed
-  # via report.html). spatial_assign (ecoscope-workflows-ext-icf) handles
-  # the point-in-polygon join; centroids come from compute_sector_centroids
-  # (reprojects to local UTM first, avoiding lon/lat centroid distortion).
-
   - title: Grid Summary Table
     type: task-group
     description: ""
@@ -1304,9 +1062,6 @@ workflow:
           right_index: false
           fillna_value: null
 
-      # PRD (Portuguese original, user-supplied): "Grupo, Quantidade de
-      # eventos, coordenadas centrais" — one combined coordinates column,
-      # not separate lat/lon columns.
       - id: grid_summary_renamed
         task: ecoscope_workflows_ext_icmbio.tasks.format_grid_summary_table
         partial:
@@ -1336,9 +1091,6 @@ workflow:
           title: "Resumo por setor"
           data: ${{ workflow.grid_summary_table_html.return }}
 
-  # ── Events map ────────────────────────────────────────────────────────────────
-  # Pattern verified against apn/workflows/patrol_event/spec.yaml.
-
   - title: Event Style
     type: task-group
     description: ""
@@ -1351,7 +1103,6 @@ workflow:
       - id: event_legend_title
         task: set_string_var
 
-      # layer_style left out of partial — see trajs_layer's comment above.
       - id: event_layer
         task: create_scatterplot_layer
         partial:
@@ -1372,14 +1123,6 @@ workflow:
             - ${{ workflow.map_overlays.return }}
             - ${{ workflow.event_layer.return }}
 
-      # Uses our own compute_view_from_geodataframes (percentile-trimmed,
-      # viewport-aware — see Patrol Coverage Map's comment for why this
-      # replaced pydeck's own compute_view) directly on event_colormap's
-      # geodataframe, the same one event_layer is built from — matches the
-      # patrol map's pattern instead of core's cruder view_state_from_layers.
-      # viewport: the SAME Map Viewport.viewport_settings instance the
-      # patrol map uses — one shared config, not two independently-editable
-      # copies of the same 4 fields.
       - id: events_map_view_state
         task: compute_view_from_geodataframes
         partial:
@@ -1417,24 +1160,10 @@ workflow:
           title: "Mapa de eventos"
           data: ${{ workflow.events_map_url.return }}
 
-  # ── Patrol events bar chart (stacked, by month × event type) ─────────────────
-  # draw_time_series_bar_chart confirmed real (registry signature dump): its
-  # real param names are x_axis/y_axis/category/agg_function/time_interval,
-  # not the df/time_column/category_column originally guessed here — it
-  # DOES support a category column directly, so ext-apn's grouped variant
-  # isn't needed after all.
-
   - title: Patrol Events Bar Chart
     type: task-group
     description: ""
     tasks:
-      # Reuses event_colormap's already-colored dataframe (Event Style
-      # group) rather than re-deriving color from Plotly's own per-trace
-      # defaults — real usage in ops-dashboard/spec.yaml always passes
-      # color_column explicitly, and this keeps the same event-type colors
-      # as the Events Map. showlegend/legend_title set explicitly (apn's
-      # vehicle_summary/spec.yaml real pattern) rather than relying on
-      # Plotly's undocumented default for an unset showlegend.
       - id: events_bar_chart
         task: draw_time_series_bar_chart
         partial:
@@ -1476,12 +1205,6 @@ workflow:
           title: "Eventos de patrulha por mês"
           data: ${{ workflow.events_bar_chart_html.return }}
 
-  # ── Photographic records ─────────────────────────────────────────────────────
-  # download_event_attachments verified in apn/workflows/patrol_event/spec.yaml.
-  # Registros Fotográficos (per instruction) exists ONLY in the docx report
-  # (generate_bimonthly_report builds its "photos" context from these
-  # attachment paths directly) — not as a separate dashboard table/widget.
-
   - name: Download Event Attachments
     id: download_attachments
     task: download_event_attachments
@@ -1491,34 +1214,10 @@ workflow:
       output_dir: ${{ env.ECOSCOPE_WORKFLOWS_RESULTS }}
       use_index_as_id: false
 
-  # ── Report (Word document) ───────────────────────────────────────────────────
-  # docxtpl-based report (ecoscope_workflows_ext_icmbio.tasks.
-  # prepare_bimonthly_report_context / generate_bimonthly_report), modeled
-  # directly on ecoscope-workflows-ext-apn's real, working
-  # generate_patrol_report — NOT the generic core create_docx item-list.
-  # Template is resources/templates/relatorio_bimestral_template.docx: the
-  # partner's own Relatório Bimestral mockup with docxtpl tags inserted by
-  # scripts/build_relatorio_bimestral_template.py (see that script's
-  # docstring for exactly what was changed, and the column-name notes for
-  # the camera-traps table's "Local"/"Setor" mismatch).
-  #
-  # html_to_png (ecoscope-workflows-ext-custom, already a dependency)
-  # converts the 3 persisted map HTML files to real PNGs first — docxtpl's
-  # InlineImage needs an actual image file, not HTML (this is the
-  # conversion step Curaçao's real docx pipeline does too).
-
   - title: Report Maps to PNG
     type: task-group
     description: "Convert the 3 persisted map HTML files to PNG for the docx report."
     tasks:
-      # config is internal PNG-capture mechanics (screenshot size, device
-      # scale, timeouts) for feeding map images into the docx report — not
-      # a user-facing choice, so it's hardcoded here rather than left
-      # exposed. All values match ScreenshotConfig's own defaults except
-      # wait_for_timeout, raised from the 30s default to 240s (4 min) —
-      # our patrol coverage map alone is ~93-97MB of real points/tiles,
-      # comfortably more headroom than wildaid-patrol_event/spec.yaml's
-      # real 100s for a similar combined map.
       - id: patrol_map_png
         task: html_to_png
         partial:
@@ -1571,8 +1270,16 @@ workflow:
       - id: report_template_path
         task: set_string_var
 
+      # skipif: never overrides the global any_is_empty_df/any_dependency_skipped
+      # defaults — a bimonthly period with e.g. zero roadkill or camera-trap
+      # events is a normal, real outcome, not a reason to silently drop the
+      # entire report. prepare_bimonthly_report_context/generate_bimonthly_report
+      # treat a skipped upstream table as "no data this period" instead.
       - id: report_context
         task: ecoscope_workflows_ext_icmbio.tasks.prepare_bimonthly_report_context
+        skipif:
+          conditions:
+            - never
         partial:
           time_range: ${{ workflow.time_range.return }}
           total_patrols: ${{ workflow.total_patrols.return }}
@@ -1587,6 +1294,9 @@ workflow:
 
       - id: patrol_report
         task: ecoscope_workflows_ext_icmbio.tasks.generate_bimonthly_report
+        skipif:
+          conditions:
+            - never
         partial:
           context: ${{ workflow.report_context.return }}
           template_path: ${{ workflow.report_template_path.return }}
@@ -1597,11 +1307,9 @@ workflow:
           photo_events: ${{ workflow.event_colormap.return }}
           output_dir: ${{ env.ECOSCOPE_WORKFLOWS_RESULTS }}
 
-  # ── Dashboard ─────────────────────────────────────────────────────────────────
-
   - name: Dashboard
     id: dashboard
-    task: gather_dashboard
+    task: gather_icmbio_dashboard
     partial:
       details: ${{ workflow.workflow_details.return }}
       widgets:
@@ -1618,4 +1326,5 @@ workflow:
         - ${{ workflow.time_density_map_widget.return }}
         - ${{ workflow.events_map_widget.return }}
         - ${{ workflow.events_bar_chart_sv.return }}
+      groupers: ${{ workflow.groupers.return }}
       time_range: ${{ workflow.time_range.return }}

@@ -18,6 +18,7 @@ from ecoscope.platform.tasks.filter import (
     get_timezone_from_time_range as get_timezone_from_time_range,
 )
 from ecoscope.platform.tasks.filter import set_time_range as set_time_range
+from ecoscope.platform.tasks.groupby import set_groupers as set_groupers
 from ecoscope.platform.tasks.io import get_events as get_events
 from ecoscope.platform.tasks.io import (
     get_patrol_observations as get_patrol_observations,
@@ -52,7 +53,6 @@ from ecoscope.platform.tasks.results import draw_table as draw_table
 from ecoscope.platform.tasks.results import (
     draw_time_series_bar_chart as draw_time_series_bar_chart,
 )
-from ecoscope.platform.tasks.results import gather_dashboard as gather_dashboard
 from ecoscope.platform.tasks.results import set_base_maps as set_base_maps
 from ecoscope.platform.tasks.skip import (
     any_dependency_skipped as any_dependency_skipped,
@@ -112,6 +112,9 @@ from ecoscope_workflows_ext_icmbio.tasks import (
 )
 from ecoscope_workflows_ext_icmbio.tasks import (
     format_threat_event_details as format_threat_event_details,
+)
+from ecoscope_workflows_ext_icmbio.tasks import (
+    gather_icmbio_dashboard as gather_icmbio_dashboard,
 )
 from ecoscope_workflows_ext_icmbio.tasks import (
     generate_bimonthly_report as generate_bimonthly_report,
@@ -217,6 +220,23 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             unpack_depth=1,
         )
         .partial(**(params.get("base_maps") or {}))
+        .call()
+    )
+
+    groupers = (
+        task(set_groupers)
+        .validate()
+        .set_task_instance_id("groupers")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(groupers=[], **(params.get("groupers") or {}))
         .call()
     )
 
@@ -2242,8 +2262,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .with_tracing()
         .skipif(
             conditions=[
-                any_is_empty_df,
-                any_dependency_skipped,
+                never,
             ],
             unpack_depth=1,
         )
@@ -2271,8 +2290,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .with_tracing()
         .skipif(
             conditions=[
-                any_is_empty_df,
-                any_dependency_skipped,
+                never,
             ],
             unpack_depth=1,
         )
@@ -2291,7 +2309,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
     )
 
     dashboard = (
-        task(gather_dashboard)
+        task(gather_icmbio_dashboard)
         .validate()
         .set_task_instance_id("dashboard")
         .handle_errors()
@@ -2320,6 +2338,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
                 events_map_widget,
                 events_bar_chart_sv,
             ],
+            groupers=groupers,
             time_range=time_range,
             **(params.get("dashboard") or {}),
         )
