@@ -13,11 +13,9 @@ requirements:
     version: 0.9.2
     channel: conda-forge
 
-  # ICMBio-specific task package, under active local development again —
-  # built via `make build` (wd-partner-tasks: BUILD_PKG=icmbio pixi run
-  # build-release) into the local channel below, not the published one, so
-  # source changes here take effect on the next `make compile` without
-  # needing a release first.
+  # Testing a fix for generate_bimonthly_report not tolerating a skipped map
+  # PNG (found via a short test date range) — temporarily local until that
+  # fix is released. Switch back to the published 0.0.4+ version once it is.
   - name: ecoscope-workflows-ext-icmbio
     version: "*"
     channel: file:///tmp/ecoscope-workflows-custom/release/artifacts/

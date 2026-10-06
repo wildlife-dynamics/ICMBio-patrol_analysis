@@ -19,9 +19,9 @@ installed_requirements:
   version: {version: ==0.9.2}
 - channel: file:///tmp/ecoscope-workflows-custom/release/artifacts/
   name: ecoscope-workflows-ext-icmbio
-  version: {version: ==0.0.3}
+  version: {version: ==0.0.4}
 params_sha256: 19ecedca6b305cc51395aa71653ceacb5afa5bf5e831fde1c14c3560e7fd4530
-spec_sha256: b78c4d755720104e0a32b99e3993cb549a24d18066ccc1da85f334f471c70589
+spec_sha256: d1a21851d77e85f28d4c9a0b3d467b2417e66d05fa5e77e8390ac6515c796c61
 
 ```
 
