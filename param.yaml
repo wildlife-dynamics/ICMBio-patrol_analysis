@@ -87,6 +87,17 @@ event_layer:
     get_fill_color: column_color
     get_line_color: column_color
 
+# Exercises the new Show Labels feature against a real, visible feature
+# (the real 28-polygon Sector Ecoscope grid is hidden server-side — see
+# get_icmbio_sector_layer's note — so this uses the "Setores" boundary
+# instead, the closest visible feature through this generic path).
+spatial_features:
+  source:
+    query:
+      feature_type: "Setores"
+spatial_features_labels:
+  show_labels: true
+
 download_attachments:
   skip_download: true
 

@@ -277,13 +277,25 @@
             "done"
           ],
           "items": {
-            "enum": [
-              "active",
-              "overdue",
-              "done",
-              "cancelled"
-            ],
-            "type": "string"
+            "type": "string",
+            "oneOf": [
+              {
+                "const": "active",
+                "title": "Active"
+              },
+              {
+                "const": "overdue",
+                "title": "Overdue"
+              },
+              {
+                "const": "done",
+                "title": "Done"
+              },
+              {
+                "const": "cancelled",
+                "title": "Cancelled"
+              }
+            ]
           },
           "title": "Patrol Status",
           "type": "array",
@@ -400,6 +412,20 @@
           "type": "string",
           "description": "Label shown in the map legend e.g. 'Park Boundary'.",
           "ecoscope:advanced": true
+        }
+      },
+      "required": [],
+      "type": "object",
+      "title": ""
+    },
+    "spatial_features_labels": {
+      "additionalProperties": false,
+      "properties": {
+        "show_labels": {
+          "default": false,
+          "title": "Show Labels",
+          "type": "boolean",
+          "description": "If True, show each feature's name as a text label on the map."
         }
       },
       "required": [],
@@ -563,6 +589,43 @@
       },
       "type": "object",
       "required": [],
+      "title": ""
+    },
+    "events_raw": {
+      "additionalProperties": false,
+      "properties": {
+        "event_states": {
+          "default": null,
+          "items": {
+            "type": "string",
+            "oneOf": [
+              {
+                "const": "new",
+                "title": "New"
+              },
+              {
+                "const": "active",
+                "title": "Active"
+              },
+              {
+                "const": "resolved",
+                "title": "Resolved"
+              },
+              {
+                "const": "review",
+                "title": "Review"
+              }
+            ]
+          },
+          "title": "Event State",
+          "type": "array",
+          "description": "Choose to analyze events with a certain state. If left empty, events of all states will be analyzed",
+          "uniqueItems": true,
+          "ecoscope:advanced": true
+        }
+      },
+      "required": [],
+      "type": "object",
       "title": ""
     },
     "event_colormap": {
@@ -1457,11 +1520,13 @@
       "relocs_in_bounds",
       "trajs",
       "spatial_features",
+      "spatial_features_labels",
       "local_spatial_file",
       "viewport_settings",
       "patrol_colormap",
       "trajs_legend_title",
       "trajs_layer",
+      "events_raw",
       "event_colormap",
       "event_legend_title",
       "event_layer",
