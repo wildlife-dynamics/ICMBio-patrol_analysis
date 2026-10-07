@@ -226,3 +226,6 @@ Makefile.local
 ~$*
 .tmp
 .DS_Store
+
+# Local debug/verification scripts — not part of the compiled workflow
+.scripts/
