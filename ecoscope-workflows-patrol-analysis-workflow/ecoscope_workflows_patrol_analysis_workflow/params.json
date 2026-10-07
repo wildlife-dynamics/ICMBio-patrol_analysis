@@ -412,20 +412,23 @@
           "type": "string",
           "description": "Label shown in the map legend e.g. 'Park Boundary'.",
           "ecoscope:advanced": true
-        }
-      },
-      "required": [],
-      "type": "object",
-      "title": ""
-    },
-    "spatial_features_labels": {
-      "additionalProperties": false,
-      "properties": {
+        },
         "show_labels": {
           "default": false,
           "title": "Show Labels",
           "type": "boolean",
-          "description": "If True, show each feature's name as a text label on the map."
+          "description": "If True, show each feature's name as a text label on the map.",
+          "ecoscope:advanced": true
+        },
+        "label_style": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/LabelStyle"
+          },
+          "maxItems": 1,
+          "title": "",
+          "type": "array",
+          "ecoscope:advanced": true
         }
       },
       "required": [],
@@ -959,6 +962,13 @@
           "minLength": 1,
           "title": "Featureset Name",
           "type": "string"
+        },
+        "include_hidden": {
+          "default": false,
+          "description": "Include feature classes an EarthRanger administrator has marked as not visible.",
+          "ecoscope:advanced": true,
+          "title": "Include Hidden",
+          "type": "boolean"
         }
       },
       "required": [
@@ -985,12 +995,65 @@
           "maxItems": 1,
           "title": "Style",
           "type": "array"
+        },
+        "include_hidden": {
+          "default": false,
+          "description": "Include feature classes an EarthRanger administrator has marked as not visible.",
+          "ecoscope:advanced": true,
+          "title": "Include Hidden",
+          "type": "boolean"
         }
       },
       "required": [
         "feature_type"
       ],
       "title": "Feature Type",
+      "type": "object"
+    },
+    "LabelStyle": {
+      "properties": {
+        "size": {
+          "default": 14,
+          "description": "Label text size.",
+          "title": "Size",
+          "type": "number"
+        },
+        "size_units": {
+          "default": "pixels",
+          "description": "Unit for Size, and for the min/max pixel bounds below.",
+          "enum": [
+            "meters",
+            "pixels"
+          ],
+          "title": "Size Units",
+          "type": "string"
+        },
+        "size_min_pixels": {
+          "default": 8,
+          "description": "Label never renders smaller than this many pixels, regardless of zoom.",
+          "title": "Size Min Pixels",
+          "type": "number"
+        },
+        "size_max_pixels": {
+          "default": 28,
+          "description": "Label never renders larger than this many pixels, regardless of zoom.",
+          "title": "Size Max Pixels",
+          "type": "number"
+        },
+        "color": {
+          "default": "#000000",
+          "description": "Label hex colour.",
+          "title": "Color",
+          "type": "string"
+        },
+        "background": {
+          "default": false,
+          "description": "If True, show a solid background box behind each label.",
+          "title": "Background",
+          "type": "boolean"
+        }
+      },
+      "title": "",
       "type": "object"
     },
     "LayerStyle": {
@@ -1467,7 +1530,9 @@
       "ui:order": [
         "source",
         "group_by",
-        "legend_title"
+        "legend_title",
+        "show_labels",
+        "label_style"
       ]
     },
     "local_spatial_file": {
@@ -1520,7 +1585,6 @@
       "relocs_in_bounds",
       "trajs",
       "spatial_features",
-      "spatial_features_labels",
       "local_spatial_file",
       "viewport_settings",
       "patrol_colormap",

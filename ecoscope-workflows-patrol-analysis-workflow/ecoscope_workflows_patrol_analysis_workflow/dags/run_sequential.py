@@ -48,9 +48,6 @@ from ecoscope.platform.tasks.results import (
 from ecoscope.platform.tasks.results import (
     create_single_value_widget_single_view as create_single_value_widget_single_view,
 )
-from ecoscope.platform.tasks.results import (
-    create_text_layer_pydeck as create_text_layer_pydeck,
-)
 from ecoscope.platform.tasks.results import draw_map as draw_map
 from ecoscope.platform.tasks.results import draw_table as draw_table
 from ecoscope.platform.tasks.results import (
@@ -80,6 +77,9 @@ from ecoscope_workflows_ext_custom.tasks.io import (
 from ecoscope_workflows_ext_custom.tasks.io import html_to_png as html_to_png
 from ecoscope_workflows_ext_custom.tasks.io import (
     load_local_spatial_file as load_local_spatial_file,
+)
+from ecoscope_workflows_ext_custom.tasks.results import (
+    create_spatial_feature_labels_layer as create_spatial_feature_labels_layer,
 )
 from ecoscope_workflows_ext_custom.tasks.results import (
     create_spatial_features_layer as create_spatial_features_layer,
@@ -127,9 +127,6 @@ from ecoscope_workflows_ext_icmbio.tasks import (
 )
 from ecoscope_workflows_ext_icmbio.tasks import (
     prepare_bimonthly_report_context as prepare_bimonthly_report_context,
-)
-from ecoscope_workflows_ext_icmbio.tasks import (
-    prepare_feature_labels as prepare_feature_labels,
 )
 from ecoscope_workflows_ext_icmbio.tasks import (
     set_viewport_settings as set_viewport_settings,
@@ -699,10 +696,10 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
-    spatial_features_labels = (
-        task(prepare_feature_labels)
+    spatial_features_labels_layer = (
+        task(create_spatial_feature_labels_layer)
         .validate()
-        .set_task_instance_id("spatial_features_labels")
+        .set_task_instance_id("spatial_features_labels_layer")
         .handle_errors()
         .with_tracing()
         .skipif(
@@ -714,40 +711,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         )
         .partial(
             geodataframe=spatial_features,
-            name_column="title",
-            **(params.get("spatial_features_labels") or {}),
-        )
-        .call()
-    )
-
-    spatial_features_text_layer = (
-        task(create_text_layer_pydeck)
-        .validate()
-        .set_task_instance_id("spatial_features_text_layer")
-        .handle_errors()
-        .with_tracing()
-        .skipif(
-            conditions=[
-                any_is_empty_df,
-                any_dependency_skipped,
-            ],
-            unpack_depth=1,
-        )
-        .partial(
-            geodataframe=spatial_features_labels,
-            data_url=None,
-            layer_style={
-                "get_text": "label",
-                "get_color": [20, 20, 20, 255],
-                "background": False,
-                "size_units": "meters",
-                "get_size": 400,
-                "size_min_pixels": 8,
-                "size_max_pixels": 28,
-            },
-            legend=None,
-            tooltip_columns=None,
-            **(params.get("spatial_features_text_layer") or {}),
+            **(params.get("spatial_features_labels_layer") or {}),
         )
         .call()
     )
@@ -805,7 +769,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .partial(
             layers=[
                 spatial_features_layer,
-                spatial_features_text_layer,
+                spatial_features_labels_layer,
                 local_spatial_features_layer,
             ],
             **(params.get("map_overlays") or {}),
