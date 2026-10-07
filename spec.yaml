@@ -6,7 +6,7 @@ requirements:
     channel: https://repo.prefix.dev/ecoscope-workflows/
 
   - name: ecoscope-workflows-ext-custom
-    version: "0.1.1"
+    version: "0.1.2"
     channel: https://repo.prefix.dev/ecoscope-workflows-custom/
 
   - name: pydeck
@@ -14,7 +14,7 @@ requirements:
     channel: conda-forge
 
   - name: ecoscope-workflows-ext-icmbio
-    version: "0.0.1"
+    version: "0.0.6"
     channel: https://repo.prefix.dev/ecoscope-workflows-custom/
 
 rjsf-overrides:
@@ -282,6 +282,16 @@ rjsf-overrides:
     Spatial Features.properties.spatial_features.properties.source.default:
       query: null
     Spatial Features.properties.spatial_features.properties.legend_title.ui:placeholder: "e.g. Park Boundary"
+    # No title/description key at all (not just blanked) — pydantic can't omit
+    # these from a field's own generated schema, so this wholesale-replaces
+    # the property instead of just blanking title/description.
+    Spatial Features.properties.spatial_features.properties.label_style:
+      default: []
+      items:
+        $ref: "#/$defs/LabelStyle"
+      maxItems: 1
+      type: array
+      ecoscope:advanced: true
     Local Spatial Features.properties.local_spatial_file.properties.file_path.title: Local File Path
     Local Spatial Features.properties.local_spatial_file.properties.file_path.description: "GeoJSON (.geojson), GeoPackage (.gpkg), or GeoParquet (.parquet/.geoparquet)."
     Local Spatial Features.properties.local_spatial_file.properties.layer.default: ""
@@ -316,6 +326,11 @@ rjsf-overrides:
           label: false
       - ui:options:
           label: false
+    # Array fields use a different option key (displayLabel) than plain
+    # object fields (label) in ecoscope-web's custom ArrayFieldTemplate.
+    Spatial Features.spatial_features.label_style:
+      ui:options:
+        displayLabel: false
     Patrol Style.trajs_layer.layer_style.get_color:
       ui:widget: hidden
     Patrol Style.trajs_layer.layer_style.get_path:
@@ -579,6 +594,11 @@ workflow:
           geodataframe: ${{ workflow.spatial_features.return }}
           tooltip_columns: []
 
+      - id: spatial_features_labels_layer
+        task: create_spatial_feature_labels_layer
+        partial:
+          geodataframe: ${{ workflow.spatial_features.return }}
+
   - title: Local Spatial Features
     type: task-group
     description: "Optionally overlay a locally-uploaded spatial file on the patrol map."
@@ -604,6 +624,7 @@ workflow:
         partial:
           layers:
             - ${{ workflow.spatial_features_layer.return }}
+            - ${{ workflow.spatial_features_labels_layer.return }}
             - ${{ workflow.local_spatial_features_layer.return }}
 
   - title: Map Viewport

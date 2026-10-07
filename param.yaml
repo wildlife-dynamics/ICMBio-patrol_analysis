@@ -16,8 +16,8 @@ er_client:
     name: parnaiguacu
 
 time_range:
-  since: "2026-07-01T00:00:00.000Z"
-  until: "2026-09-01T00:00:00.000Z"
+  since: "2026-08-01T00:00:00.000Z"
+  until: "2026-08-04T00:00:00.000Z"
 
 base_maps:
   base_maps:
@@ -86,6 +86,18 @@ event_layer:
   layer_style:
     get_fill_color: column_color
     get_line_color: column_color
+
+# Exercises the Show Labels feature against the real, hidden (is_visible=False)
+# 28-polygon Sector Ecoscope grid, via include_hidden — the multi-feature
+# label case, not just the single-feature "Setores" boundary.
+spatial_features:
+  source:
+    query:
+      feature_type: "Sector Ecoscope"
+      include_hidden: true
+  show_labels: true
+  label_style:
+    - color: "#1d3557"
 
 download_attachments:
   skip_download: true

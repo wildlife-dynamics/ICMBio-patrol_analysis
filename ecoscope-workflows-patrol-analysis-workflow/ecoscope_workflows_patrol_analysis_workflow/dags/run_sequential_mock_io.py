@@ -82,6 +82,9 @@ from ecoscope_workflows_ext_custom.tasks.io import (
     load_local_spatial_file as load_local_spatial_file,
 )
 from ecoscope_workflows_ext_custom.tasks.results import (
+    create_spatial_feature_labels_layer as create_spatial_feature_labels_layer,
+)
+from ecoscope_workflows_ext_custom.tasks.results import (
     create_spatial_features_layer as create_spatial_features_layer,
 )
 from ecoscope_workflows_ext_icmbio.tasks import (
@@ -716,6 +719,26 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
+    spatial_features_labels_layer = (
+        task(create_spatial_feature_labels_layer)
+        .validate()
+        .set_task_instance_id("spatial_features_labels_layer")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            geodataframe=spatial_features,
+            **(params.get("spatial_features_labels_layer") or {}),
+        )
+        .call()
+    )
+
     local_spatial_file = (
         task(load_local_spatial_file)
         .validate()
@@ -767,7 +790,11 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             unpack_depth=1,
         )
         .partial(
-            layers=[spatial_features_layer, local_spatial_features_layer],
+            layers=[
+                spatial_features_layer,
+                spatial_features_labels_layer,
+                local_spatial_features_layer,
+            ],
             **(params.get("map_overlays") or {}),
         )
         .call()

@@ -282,13 +282,25 @@
                 "done"
               ],
               "items": {
-                "enum": [
-                  "active",
-                  "overdue",
-                  "done",
-                  "cancelled"
-                ],
-                "type": "string"
+                "type": "string",
+                "oneOf": [
+                  {
+                    "const": "active",
+                    "title": "Active"
+                  },
+                  {
+                    "const": "overdue",
+                    "title": "Overdue"
+                  },
+                  {
+                    "const": "done",
+                    "title": "Done"
+                  },
+                  {
+                    "const": "cancelled",
+                    "title": "Cancelled"
+                  }
+                ]
               },
               "title": "Patrol Status",
               "type": "array",
@@ -415,6 +427,22 @@
               "description": "Label shown in the map legend e.g. 'Park Boundary'.",
               "ecoscope:advanced": true,
               "ui:placeholder": "e.g. Park Boundary"
+            },
+            "show_labels": {
+              "default": false,
+              "title": "Show Labels",
+              "type": "boolean",
+              "description": "If True, show each feature's name as a text label on the map.",
+              "ecoscope:advanced": true
+            },
+            "label_style": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/LabelStyle"
+              },
+              "maxItems": 1,
+              "type": "array",
+              "ecoscope:advanced": true
             }
           },
           "required": [],
@@ -730,6 +758,50 @@
           },
           "type": "object",
           "required": [],
+          "title": ""
+        }
+      }
+    },
+    "Events": {
+      "type": "object",
+      "description": "",
+      "ecoscope:task_group": true,
+      "properties": {
+        "events_raw": {
+          "additionalProperties": false,
+          "properties": {
+            "event_states": {
+              "default": null,
+              "items": {
+                "type": "string",
+                "oneOf": [
+                  {
+                    "const": "new",
+                    "title": "New"
+                  },
+                  {
+                    "const": "active",
+                    "title": "Active"
+                  },
+                  {
+                    "const": "resolved",
+                    "title": "Resolved"
+                  },
+                  {
+                    "const": "review",
+                    "title": "Review"
+                  }
+                ]
+              },
+              "title": "Event State",
+              "type": "array",
+              "description": "Choose to analyze events with a certain state. If left empty, events of all states will be analyzed",
+              "uniqueItems": true,
+              "ecoscope:advanced": true
+            }
+          },
+          "required": [],
+          "type": "object",
           "title": ""
         }
       }
@@ -1294,6 +1366,13 @@
           "minLength": 1,
           "title": "Featureset Name",
           "type": "string"
+        },
+        "include_hidden": {
+          "default": false,
+          "description": "Include feature classes an EarthRanger administrator has marked as not visible.",
+          "ecoscope:advanced": true,
+          "title": "Include Hidden",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1320,12 +1399,65 @@
           "maxItems": 1,
           "title": "Style",
           "type": "array"
+        },
+        "include_hidden": {
+          "default": false,
+          "description": "Include feature classes an EarthRanger administrator has marked as not visible.",
+          "ecoscope:advanced": true,
+          "title": "Include Hidden",
+          "type": "boolean"
         }
       },
       "required": [
         "feature_type"
       ],
       "title": "Feature Type",
+      "type": "object"
+    },
+    "LabelStyle": {
+      "properties": {
+        "size": {
+          "default": 14,
+          "description": "Label text size.",
+          "title": "Size",
+          "type": "number"
+        },
+        "size_units": {
+          "default": "pixels",
+          "description": "Unit for Size, and for the min/max pixel bounds below.",
+          "enum": [
+            "meters",
+            "pixels"
+          ],
+          "title": "Size Units",
+          "type": "string"
+        },
+        "size_min_pixels": {
+          "default": 8,
+          "description": "Label never renders smaller than this many pixels, regardless of zoom.",
+          "title": "Size Min Pixels",
+          "type": "number"
+        },
+        "size_max_pixels": {
+          "default": 28,
+          "description": "Label never renders larger than this many pixels, regardless of zoom.",
+          "title": "Size Max Pixels",
+          "type": "number"
+        },
+        "color": {
+          "default": "#000000",
+          "description": "Label hex colour.",
+          "title": "Color",
+          "type": "string"
+        },
+        "background": {
+          "default": false,
+          "description": "If True, show a solid background box behind each label.",
+          "title": "Background",
+          "type": "boolean"
+        }
+      },
+      "title": "",
       "type": "object"
     },
     "LayerStyle": {
@@ -1805,7 +1937,9 @@
         "ui:order": [
           "source",
           "group_by",
-          "legend_title"
+          "legend_title",
+          "show_labels",
+          "label_style"
         ],
         "source": {
           "ui:options": {
@@ -1832,6 +1966,11 @@
                 }
               }
             ]
+          }
+        },
+        "label_style": {
+          "ui:options": {
+            "displayLabel": false
           }
         }
       }
@@ -1924,6 +2063,7 @@
       "Local Spatial Features",
       "Map Viewport",
       "Patrol Style",
+      "Events",
       "Event Style",
       "download_attachments",
       "Patrol Report"
